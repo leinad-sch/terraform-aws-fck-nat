@@ -91,6 +91,12 @@ variable "use_spot_instances" {
   default     = false
 }
 
+variable "termination_policies" {
+  description = "Termination policies for the autoscaling group"
+  type = list(string)
+  default = ["OldestInstance"]
+}
+
 variable "use_cloudwatch_agent" {
   description = "Whether or not to enable CloudWatch agent for the NAT instance"
   type        = bool
