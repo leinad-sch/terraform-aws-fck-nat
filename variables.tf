@@ -67,6 +67,12 @@ variable "ami_id" {
   default     = null
 }
 
+variable "min_size" {
+  description = "Minimum size of the autoscaling group"
+  type        = number
+  default     = 1
+}
+
 variable "ebs_root_volume_size" {
   description = "Size of the EBS root volume in GB"
   type        = number
@@ -99,8 +105,8 @@ variable "use_spot_instances" {
 
 variable "termination_policies" {
   description = "Termination policies for the autoscaling group"
-  type = list(string)
-  default = ["OldestInstance"]
+  type        = list(string)
+  default     = ["OldestInstance"]
 }
 
 variable "mixed_instances_policy" {
