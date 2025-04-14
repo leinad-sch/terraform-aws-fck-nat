@@ -8,6 +8,8 @@ resource "aws_autoscaling_group" "main" {
   health_check_type   = "EC2"
   vpc_zone_identifier = [var.subnet_id]
 
+  termination_policies = var.termination_policies
+
   launch_template {
     id      = aws_launch_template.main.id
     version = "$Latest"
