@@ -1,88 +1,24 @@
-locals {
-  mixed_instances_policy = (
-    var.mixed_instances_policy == null ? null : {
-    instances_distribution = var.mixed_instances_policy.instances_distribution
-    launch_template        = aws_launch_template.main
-    override               = var.mixed_instances_policy.override
-  })
+variable "capacity_rebalance" {
+  default = ""
 }
+module "aws_autoscaling_group" {
+  source  = "cloudposse/ec2-autoscale-group/aws"
+  version = "0.41.1"
+  count   = var.ha_mode ? 1 : 0
 
-resource "aws_autoscaling_group" "main" {
-  count = var.ha_mode ? 1 : 0
+  name             = var.name
+  max_size         = 1
+  min_size         = 1
+  desired_capacity = 1
+  subnet_ids = [var.subnet_id]
 
-  name                = var.name
-  max_size            = 1
-  min_size            = 1
-  desired_capacity    = 1
-  health_check_type   = "EC2"
-  vpc_zone_identifier = [var.subnet_id]
+  health_check_type         = "EC2"
+  wait_for_capacity_timeout = "1m"
+  termination_policies      = var.termination_policies
 
-  termination_policies = var.termination_policies
+  instance_type = var.instance_type
 
-  dynamic "mixed_instances_policy" {
-    for_each = (local.mixed_instances_policy != null ?
-      [local.mixed_instances_policy] : [])
-    content {
-      dynamic "instances_distribution" {
-        for_each = (
-          mixed_instances_policy.value.instances_distribution != null ?
-          [mixed_instances_policy.value.instances_distribution] : [])
-        content {
-          on_demand_allocation_strategy = lookup(
-            instances_distribution.value, "on_demand_allocation_strategy", null)
-          on_demand_base_capacity = lookup(
-            instances_distribution.value, "on_demand_base_capacity", null)
-          on_demand_percentage_above_base_capacity = lookup(
-            instances_distribution.value, "on_demand_percentage_above_base_capacity", null)
-          spot_allocation_strategy = lookup(
-            instances_distribution.value, "spot_allocation_strategy", null)
-          spot_instance_pools = lookup(
-            instances_distribution.value, "spot_instance_pools", null)
-          spot_max_price = lookup(
-            instances_distribution.value, "spot_max_price", null)
-        }
-      }
-      launch_template {
-        launch_template_specification {
-          launch_template_id = mixed_instances_policy.value.launch_template.id
-          version            = mixed_instances_policy.value.launch_template.version
-        }
-        dynamic "override" {
-          for_each = (mixed_instances_policy.value.override != null ?
-            mixed_instances_policy.value.override : [])
-          content {
-            instance_type = lookup(override.value, "instance_type", null)
-            weighted_capacity = lookup(override.value, "weighted_capacity", null)
-          }
-        }
-      }
-    }
-  }
-
-  launch_template {
-    id      = aws_launch_template.main.id
-    version = "$Latest"
-  }
-
-  dynamic "tag" {
-    for_each = lookup(var.tags, "Name", null) == null ? ["Name"] : []
-
-    content {
-      key                 = "Name"
-      value               = var.name
-      propagate_at_launch = true
-    }
-  }
-
-  dynamic "tag" {
-    for_each = var.tags
-
-    content {
-      key                 = tag.key
-      value               = tag.value
-      propagate_at_launch = false
-    }
-  }
+  mixed_instances_policy = var.mixed_instances_policy
 
   enabled_metrics = [
     "GroupMinSize",
@@ -107,7 +43,32 @@ resource "aws_autoscaling_group" "main" {
     "GroupAndWarmPoolTotalCapacity"
   ]
 
-  timeouts {
-    delete = "15m"
-  }
+  tags = var.tags
+
+  # values shared with the launch template
+  image_id = local.ami_id
+  key_name = var.ssh_key_name
+  credit_specification = { cpu_credits = var.credit_specification }
+  block_device_mappings = [
+    {
+      device_name = "/dev/xvda"
+      ebs = {
+        volume_size = var.ebs_root_volume_size
+        volume_type = "gp3"
+        encrypted   = var.encryption
+        kms_key_id  = var.kms_key_id
+      }
+    }
+  ]
+  iam_instance_profile_name = aws_iam_instance_profile.main.name
+
+  security_group_ids          = local.security_groups
+  associate_public_ip_address = true
+  instance_market_options     = var.use_spot_instances && var.mixed_instances_policy == null ? { market_type = "spot" } : null
+  tag_specifications_resource_types = ["instance", "network-interface", "volume"]
+  user_data_base64            = data.cloudinit_config.this.rendered
+
+  metadata_http_endpoint_enabled = true
+  metadata_http_tokens_required  = true
+  capacity_rebalance = var.capacity_rebalance
 }

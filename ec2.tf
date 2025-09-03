@@ -56,6 +56,8 @@ data "cloudinit_config" "this" {
 }
 
 resource "aws_launch_template" "main" {
+  count = var.ha_mode ? 0 : 1
+
   #checkov:skip=CKV_AWS_88:NAT instances must have a public IP.
   name          = var.name
   image_id      = local.ami_id
@@ -119,7 +121,7 @@ resource "aws_instance" "main" {
   count = var.ha_mode ? 0 : 1
 
   launch_template {
-    id      = aws_launch_template.main.id
+    id      = aws_launch_template.main[0].id
     version = "$Latest"
   }
 

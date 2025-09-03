@@ -30,12 +30,12 @@ output "ha_mode" {
 
 output "instance_type" {
   description = "Instance type used for the fck-nat instance"
-  value       = aws_launch_template.main.instance_type
+  value       = var.instance_type
 }
 
 output "ami_id" {
   description = "AMI to use for the NAT instance. Uses fck-nat latest arm64 AMI in the region if none provided"
-  value       = aws_launch_template.main.image_id
+  value       = var.ami_id != null ? var.ami_id : data.aws_ami.main[0].id
 }
 
 output "eni_id" {
@@ -75,7 +75,7 @@ output "instance_profile_arn" {
 
 output "launch_template_id" {
   description = "The ID of the launch template used to spawn fck-nat instances"
-  value       = aws_launch_template.main.arn
+  value       = var.ha_mode ? module.aws_autoscaling_group[0].launch_template_id : aws_launch_template.main[0].arn
 }
 
 output "instance_arn" {
@@ -90,7 +90,7 @@ output "instance_public_ip" {
 
 output "autoscaling_group_arn" {
   description = "The ARN of the autoscaling group if running in HA mode"
-  value       = var.ha_mode ? aws_autoscaling_group.main[0].arn : null
+  value       = var.ha_mode ? module.aws_autoscaling_group[0].autoscaling_group_arn : null
 }
 
 output "cw_agent_config_ssm_parameter_arn" {
